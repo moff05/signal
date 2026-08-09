@@ -36,6 +36,10 @@ yarn-error.log*
 # vercel
 .vercel
 
+# local dev data (production uses Turso + Vercel Blob instead)
+/data
+/public/uploads
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
