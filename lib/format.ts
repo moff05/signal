@@ -18,3 +18,8 @@ export function formatCompletedDate(completedAt: string | null): string {
   if (!completedAt) return '';
   return `Completed ${formatDistanceToNow(new Date(completedAt), { addSuffix: true })}`;
 }
+
+export function formatRemovedDate(deletedAt: string | null): string {
+  if (!deletedAt) return '';
+  return `Removed ${formatDistanceToNow(new Date(deletedAt), { addSuffix: true })}`;
+}

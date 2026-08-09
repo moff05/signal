@@ -120,8 +120,8 @@ export default function SettingsPage() {
         {connected === false && (
           <a
             href="/api/auth/google"
-            className="mt-3 flex items-center justify-center gap-1.5 rounded-lg py-2.5 text-sm font-medium text-white transition-transform active:scale-95"
-            style={{ background: 'var(--accent)' }}
+            className="mt-3 flex items-center justify-center gap-1.5 rounded-lg px-4 py-2.5 text-sm font-medium text-white transition-transform active:scale-95"
+            style={{ background: 'var(--accent-fill)' }}
           >
             Connect Google Calendar
           </a>
@@ -156,11 +156,11 @@ export default function SettingsPage() {
           <button
             onClick={pushEnabled ? disablePush : enablePush}
             disabled={pushBusy}
-            className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg py-2.5 text-sm font-medium transition-transform active:scale-95 disabled:opacity-50"
+            className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg px-4 py-2.5 text-sm font-medium transition-transform active:scale-95 disabled:opacity-50"
             style={
               pushEnabled
                 ? { borderColor: 'var(--border)', border: '1px solid var(--border)', color: 'var(--text-muted)' }
-                : { background: 'var(--accent)', color: 'white' }
+                : { background: 'var(--accent-fill)', color: 'white' }
             }
           >
             {pushBusy ? 'Working…' : pushEnabled ? 'Turn off' : 'Enable daily reminder'}

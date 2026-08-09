@@ -19,10 +19,14 @@ export async function GET(request: NextRequest) {
   const status = request.nextUrl.searchParams.get('status') ?? 'active';
   const db = getDb();
 
+  const statuses = status.split(',');
   const result =
     status === 'all'
       ? await db.execute('SELECT * FROM signals')
-      : await db.execute({ sql: 'SELECT * FROM signals WHERE status = ?', args: [status] });
+      : await db.execute({
+          sql: `SELECT * FROM signals WHERE status IN (${statuses.map(() => '?').join(',')})`,
+          args: statuses,
+        });
 
   const rows = result.rows as unknown as SignalRow[];
   return NextResponse.json({ signals: sortSignals(rows) });

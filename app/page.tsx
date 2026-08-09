@@ -56,7 +56,11 @@ export default function Home() {
 
   async function deleteSignal(id: string) {
     setSignals((prev) => prev.filter((s) => s.id !== id));
-    await fetch(`/api/signals/${id}`, { method: 'DELETE' });
+    await fetch(`/api/signals/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'deleted' }),
+    });
   }
 
   function openEdit(signal: SignalRow) {
@@ -122,14 +126,15 @@ export default function Home() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search"
-            className="w-full rounded-lg border py-2.5 pl-9 pr-9 text-sm outline-none"
+            aria-label="Search"
+            className="w-full rounded-lg border py-2.5 pl-9 pr-9 text-sm"
             style={{ borderColor: 'var(--border)', background: 'var(--surface)' }}
           />
           {query && (
             <button
               onClick={() => setQuery('')}
               aria-label="Clear search"
-              className="absolute right-2.5 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-full"
+              className="absolute right-0 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full"
               style={{ color: 'var(--text-muted)' }}
             >
               <X size={14} strokeWidth={2.25} />
@@ -196,22 +201,24 @@ export default function Home() {
             )}
           </section>
 
-          <section className="flex flex-col gap-2">
-            <h2 className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
-              Backlog
-            </h2>
-            {rest.map((s) => (
-              <SignalCard
-                key={s.id}
-                signal={s}
-                onToggleSignal={toggleSignal}
-                onMarkDone={markDone}
-                onEdit={openEdit}
-                onDelete={deleteSignal}
-                style={{ animationDelay: `${cardIndex++ * 40}ms` }}
-              />
-            ))}
-          </section>
+          {rest.length > 0 && (
+            <section className="flex flex-col gap-2">
+              <h2 className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
+                Backlog
+              </h2>
+              {rest.map((s) => (
+                <SignalCard
+                  key={s.id}
+                  signal={s}
+                  onToggleSignal={toggleSignal}
+                  onMarkDone={markDone}
+                  onEdit={openEdit}
+                  onDelete={deleteSignal}
+                  style={{ animationDelay: `${cardIndex++ * 40}ms` }}
+                />
+              ))}
+            </section>
+          )}
         </div>
       )}
 
@@ -219,7 +226,7 @@ export default function Home() {
         onClick={openNew}
         className="fixed left-1/2 flex -translate-x-1/2 items-center gap-1.5 rounded-full px-6 py-3.5 font-medium text-white transition-transform active:scale-95"
         style={{
-          background: 'var(--accent)',
+          background: 'var(--accent-fill)',
           bottom: 'calc(env(safe-area-inset-bottom) + 1.5rem)',
           boxShadow: '0 10px 30px -8px var(--accent)',
         }}

@@ -108,12 +108,12 @@ export default function SignalSheet({ initial, onClose, onSaved }: Props) {
             onChange={(e) => handleTextChange(e.target.value)}
             placeholder="What's on your mind?"
             rows={3}
-            className="max-h-80 w-full resize-none overflow-y-auto rounded-lg p-2.5 outline-none"
+            className="max-h-80 w-full resize-none overflow-y-auto rounded-lg p-2.5"
           />
           {isEdit && initial?.attachment_url && !removeAttachment && !file ? (
             <div className="flex items-center gap-2 px-2.5 pb-2">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={initial.attachment_url} alt="" className="h-10 w-10 rounded-md border object-cover" style={{ borderColor: 'var(--border)' }} />
+              <img src={initial.attachment_url} alt="" loading="lazy" className="h-10 w-10 rounded-md border object-cover" style={{ borderColor: 'var(--border)' }} />
               <label className="flex flex-1 cursor-pointer items-center gap-1.5 text-sm" style={{ color: 'var(--text-muted)' }}>
                 <Paperclip size={14} strokeWidth={2} />
                 Replace photo
@@ -185,7 +185,8 @@ export default function SignalSheet({ initial, onClose, onSaved }: Props) {
               type="date"
               value={dueDate}
               onChange={(e) => setDueDate(e.target.value)}
-              className="w-full bg-transparent py-2.5 outline-none"
+              aria-label="Due date"
+              className="w-full bg-transparent py-2.5"
             />
           </div>
         )}
@@ -197,7 +198,8 @@ export default function SignalSheet({ initial, onClose, onSaved }: Props) {
               type="datetime-local"
               value={eventDatetime}
               onChange={(e) => setEventDatetime(e.target.value)}
-              className="w-full bg-transparent py-2.5 outline-none"
+              aria-label="Event date and time"
+              className="w-full bg-transparent py-2.5"
             />
           </div>
         )}
@@ -211,7 +213,7 @@ export default function SignalSheet({ initial, onClose, onSaved }: Props) {
                   type="button"
                   key={option}
                   onClick={() => setRepeat(option)}
-                  className="flex-1 rounded-lg border py-1.5 text-xs font-medium transition-[color,background-color,border-color] active:scale-95"
+                  className="flex-1 rounded-lg border py-2.5 text-xs font-medium transition-[color,background-color,border-color] active:scale-95"
                   style={{
                     borderColor: repeat === option ? 'var(--accent)' : 'var(--border)',
                     background: repeat === option ? 'var(--accent-soft)' : 'transparent',
@@ -239,7 +241,7 @@ export default function SignalSheet({ initial, onClose, onSaved }: Props) {
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 rounded-lg border py-2.5 font-medium transition-transform active:scale-95"
+            className="flex-1 rounded-lg border py-3 font-medium transition-transform active:scale-95"
             style={{ borderColor: 'var(--border)', color: 'var(--text-muted)' }}
           >
             Cancel
@@ -247,8 +249,8 @@ export default function SignalSheet({ initial, onClose, onSaved }: Props) {
           <button
             type="submit"
             disabled={saving || !text.trim()}
-            className="flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2.5 font-medium text-white transition-transform active:scale-95 disabled:opacity-50"
-            style={{ background: 'var(--accent)', boxShadow: '0 8px 24px -10px var(--accent)' }}
+            className="flex flex-1 items-center justify-center gap-1.5 rounded-lg py-3 font-medium text-white transition-transform active:scale-95 disabled:opacity-50"
+            style={{ background: 'var(--accent-fill)', boxShadow: '0 8px 24px -10px var(--accent)' }}
           >
             {saving ? 'Saving…' : (
               <>

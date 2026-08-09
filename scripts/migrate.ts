@@ -17,12 +17,13 @@ async function migrate() {
       event_datetime TEXT,
       due_date TEXT,
       is_today_signal INTEGER NOT NULL DEFAULT 0,
-      status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active','done')),
+      status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active','done','deleted')),
       gcal_event_id TEXT,
       details TEXT,
       repeat TEXT NOT NULL DEFAULT 'none' CHECK(repeat IN ('none','weekly','monthly')),
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
-      completed_at TEXT
+      completed_at TEXT,
+      deleted_at TEXT
     )
   `);
 
@@ -48,6 +49,46 @@ async function migrate() {
   }
   if (await columnExists(db, 'signals', 'manual_state')) {
     await db.execute(`ALTER TABLE signals DROP COLUMN manual_state`);
+  }
+
+  if (!(await columnExists(db, 'signals', 'deleted_at'))) {
+    await db.execute(`ALTER TABLE signals ADD COLUMN deleted_at TEXT`);
+  }
+
+  // Delete used to be instant and permanent — a mis-tap destroyed a note with
+  // no recovery, unlike Done (which lands in a restorable Archive). Widening
+  // the status enum to include 'deleted' makes Delete a soft-delete too.
+  // SQLite can't ALTER a CHECK constraint in place, so rebuild the table when
+  // an older constraint (missing 'deleted') is found. By this point every
+  // column the rebuild's INSERT...SELECT references is guaranteed to exist.
+  const tableInfo = await db.execute(`SELECT sql FROM sqlite_master WHERE type='table' AND name='signals'`);
+  const currentSql = tableInfo.rows[0]?.sql as string | undefined;
+  if (currentSql && !currentSql.includes("'deleted'")) {
+    await db.execute(`ALTER TABLE signals RENAME TO signals_old`);
+    await db.execute(`
+      CREATE TABLE signals (
+        id TEXT PRIMARY KEY,
+        text TEXT NOT NULL,
+        attachment_url TEXT,
+        type TEXT NOT NULL CHECK(type IN ('fixed_time','deadline','someday')),
+        event_datetime TEXT,
+        due_date TEXT,
+        is_today_signal INTEGER NOT NULL DEFAULT 0,
+        status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active','done','deleted')),
+        gcal_event_id TEXT,
+        details TEXT,
+        repeat TEXT NOT NULL DEFAULT 'none' CHECK(repeat IN ('none','weekly','monthly')),
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        completed_at TEXT,
+        deleted_at TEXT
+      )
+    `);
+    await db.execute(`
+      INSERT INTO signals (id, text, attachment_url, type, event_datetime, due_date, is_today_signal, status, gcal_event_id, details, repeat, created_at, completed_at, deleted_at)
+      SELECT id, text, attachment_url, type, event_datetime, due_date, is_today_signal, status, gcal_event_id, details, repeat, created_at, completed_at, deleted_at
+      FROM signals_old
+    `);
+    await db.execute(`DROP TABLE signals_old`);
   }
 
   await db.execute(

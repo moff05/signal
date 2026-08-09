@@ -56,7 +56,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     eventDatetime = 'event_datetime' in body ? body.event_datetime : existing.event_datetime;
     dueDate = 'due_date' in body ? body.due_date : existing.due_date;
     isTodaySignal = typeof body.is_today_signal === 'boolean' ? (body.is_today_signal ? 1 : 0) : (existing.is_today_signal as number);
-    status = body.status === 'done' || body.status === 'active' ? body.status : (existing.status as string);
+    status = body.status === 'done' || body.status === 'active' || body.status === 'deleted' ? body.status : (existing.status as string);
     repeat = normalizeRepeat(body.repeat, existing.repeat as RepeatInterval);
     attachmentUrl = undefined;
   }
@@ -64,9 +64,11 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   const type = eventDatetime ? 'fixed_time' : dueDate ? 'deadline' : 'someday';
   const justCompleted = status === 'done' && existing.status !== 'done';
   const completedAt = justCompleted ? new Date().toISOString() : status === 'active' ? null : existing.completed_at;
+  const justDeleted = status === 'deleted' && existing.status !== 'deleted';
+  const deletedAt = justDeleted ? new Date().toISOString() : status !== 'deleted' ? null : existing.deleted_at;
 
   await db.execute({
-    sql: `UPDATE signals SET text = ?, type = ?, event_datetime = ?, due_date = ?, is_today_signal = ?, status = ?, completed_at = ?, repeat = ?${attachmentUrl !== undefined ? ', attachment_url = ?' : ''}
+    sql: `UPDATE signals SET text = ?, type = ?, event_datetime = ?, due_date = ?, is_today_signal = ?, status = ?, completed_at = ?, deleted_at = ?, repeat = ?${attachmentUrl !== undefined ? ', attachment_url = ?' : ''}
           WHERE id = ?`,
     args: [
       text,
@@ -76,13 +78,21 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       isTodaySignal,
       status,
       completedAt,
+      deletedAt,
       type === 'someday' ? 'none' : repeat,
       ...(attachmentUrl !== undefined ? [attachmentUrl] : []),
       id,
     ],
   });
 
-  if (type === 'fixed_time' && eventDatetime) {
+  // Deleting (soft) always drops any linked calendar event, regardless of
+  // type — a deleted signal has no business still occupying a calendar slot.
+  if (status === 'deleted') {
+    if (existing.gcal_event_id) {
+      await deleteGoogleCalendarEvent(existing.gcal_event_id as string);
+      await db.execute({ sql: 'UPDATE signals SET gcal_event_id = NULL WHERE id = ?', args: [id] });
+    }
+  } else if (type === 'fixed_time' && eventDatetime) {
     if (existing.gcal_event_id) {
       await updateGoogleCalendarEvent({ eventId: existing.gcal_event_id as string, text, eventDatetime });
     } else {

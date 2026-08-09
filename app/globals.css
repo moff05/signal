@@ -10,6 +10,12 @@
   --accent: #2563eb;
   --accent-hi: #3f66e0;
   --accent-soft: rgb(37 99 235 / 0.1);
+  /* Filled-button background for white text — deliberately NOT redefined in the
+     dark media query below. Dark mode's lighter --accent (#3b82f6) reads well
+     for borders/icons/soft tints but drops white text to ~3.7:1, under the AA
+     4.5:1 floor; this stays at the darker blue-600 in both themes so buttons
+     using it always clear contrast. */
+  --accent-fill: #2563eb;
   --signal: #16a34a;
   --signal-soft: rgb(22 163 74 / 0.12);
   --urgent: #dc2626;
@@ -41,6 +47,7 @@
   --color-text-muted: var(--text-muted);
   --color-accent: var(--accent);
   --color-accent-hi: var(--accent-hi);
+  --color-accent-fill: var(--accent-fill);
   --color-signal: var(--signal);
   --color-urgent: var(--urgent);
   --font-sans: var(--font-geist-sans);
@@ -65,6 +72,15 @@ textarea,
 select {
   font: inherit;
   color: inherit;
+}
+
+/* Tailwind's outline-none utility zeroes the outline with nothing standing in
+   for it — unlayered, so it wins over that utility regardless of source order. */
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 button {

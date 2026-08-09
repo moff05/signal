@@ -44,7 +44,8 @@ export default function LoginPage() {
           value={passcode}
           onChange={(e) => setPasscode(e.target.value)}
           placeholder="Passcode"
-          className="mb-3 w-full rounded-lg border p-3 text-center outline-none"
+          aria-label="Passcode"
+          className="mb-3 w-full rounded-lg border p-3 text-center"
           style={{ borderColor: 'var(--border)', background: 'var(--surface)' }}
         />
         {error && (
@@ -56,7 +57,7 @@ export default function LoginPage() {
           type="submit"
           disabled={submitting || !passcode}
           className="w-full rounded-lg py-3 font-medium text-white transition-transform active:scale-95 disabled:opacity-50"
-          style={{ background: 'var(--accent)', boxShadow: '0 8px 24px -10px var(--accent)' }}
+          style={{ background: 'var(--accent-fill)', boxShadow: '0 8px 24px -10px var(--accent)' }}
         >
           {submitting ? 'Checking…' : 'Unlock'}
         </button>

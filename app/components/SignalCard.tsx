@@ -140,7 +140,7 @@ export default function SignalCard({ signal, onToggleSignal, onMarkDone, onEdit,
             )}
             {signal.attachment_url && (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={signal.attachment_url} alt="" className="mt-2 max-h-40 rounded-lg border" style={{ borderColor: 'var(--border)' }} />
+              <img src={signal.attachment_url} alt="" loading="lazy" className="mt-2 max-h-40 rounded-lg border" style={{ borderColor: 'var(--border)' }} />
             )}
 
             {signal.details && (
@@ -151,6 +151,7 @@ export default function SignalCard({ signal, onToggleSignal, onMarkDone, onEdit,
                     setDetailsOpen((v) => !v);
                   }}
                   onPointerDown={(e) => e.stopPropagation()}
+                  aria-expanded={detailsOpen}
                   className="mt-1.5 flex items-center gap-1 text-sm font-medium"
                   style={{ color: 'var(--accent)' }}
                 >
@@ -170,6 +171,7 @@ export default function SignalCard({ signal, onToggleSignal, onMarkDone, onEdit,
 
           <button
             aria-label={menuOpen ? 'Close actions' : 'More actions'}
+            aria-expanded={menuOpen}
             onClick={(e) => {
               e.stopPropagation();
               setMenuOpen((v) => !v);
@@ -182,7 +184,10 @@ export default function SignalCard({ signal, onToggleSignal, onMarkDone, onEdit,
           </button>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateRows: menuOpen ? '1fr' : '0fr', transition: 'grid-template-rows 200ms cubic-bezier(0.16, 1, 0.3, 1)' }}>
+        <div
+          inert={!menuOpen}
+          style={{ display: 'grid', gridTemplateRows: menuOpen ? '1fr' : '0fr', transition: 'grid-template-rows 200ms cubic-bezier(0.16, 1, 0.3, 1)' }}
+        >
           <div className="overflow-hidden">
             <div className="mt-3 flex gap-2 border-t pt-3" style={{ borderColor: 'var(--border)' }}>
               <button

@@ -9,12 +9,13 @@ export type SignalRow = {
   event_datetime: string | null;
   due_date: string | null;
   is_today_signal: number;
-  status: 'active' | 'done';
+  status: 'active' | 'done' | 'deleted';
   gcal_event_id: string | null;
   details: string | null;
   repeat: RepeatInterval;
   created_at: string;
   completed_at: string | null;
+  deleted_at: string | null;
 };
 
 // Someday items have no date, so they always sink below anything with one —
