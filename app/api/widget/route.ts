@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
+import { ensureMigrated } from '@/lib/ensureMigrated';
 import { isValidWidgetToken } from '@/lib/auth';
 import { sortSignals, type SignalRow } from '@/lib/urgency';
 import { formatSignalDate } from '@/lib/format';
@@ -12,6 +13,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
 
+  await ensureMigrated();
   const db = getDb();
   const result = await db.execute({
     sql: `SELECT * FROM signals WHERE status = 'active' AND is_today_signal = 1`,

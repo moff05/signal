@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
+import { ensureMigrated } from '@/lib/ensureMigrated';
 import { saveAttachment } from '@/lib/attachments';
 import { pushToGoogleCalendar, updateGoogleCalendarEvent, deleteGoogleCalendarEvent } from '@/lib/googleCalendar';
 import { advanceDate } from '@/lib/repeat';
@@ -12,6 +13,7 @@ function normalizeRepeat(value: unknown, fallback: RepeatInterval): RepeatInterv
 }
 
 export async function PATCH(request: NextRequest, { params }: Params) {
+  await ensureMigrated();
   const { id } = await params;
   const db = getDb();
 
@@ -133,6 +135,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 }
 
 export async function DELETE(_request: NextRequest, { params }: Params) {
+  await ensureMigrated();
   const { id } = await params;
   const db = getDb();
 

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
+import { ensureMigrated } from '@/lib/ensureMigrated';
 import { sendPushToAll } from '@/lib/webPush';
 
 // Triggered by Vercel Cron (see vercel.json) — not user-facing, so it's
@@ -11,6 +12,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
 
+  await ensureMigrated();
   const db = getDb();
   const result = await db.execute(
     `SELECT id FROM signals WHERE status = 'active' AND is_today_signal = 1`

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
+import { ensureMigrated } from '@/lib/ensureMigrated';
 import { saveAttachment } from '@/lib/attachments';
 import { sortSignals, type SignalRow } from '@/lib/urgency';
 import { pushToGoogleCalendar } from '@/lib/googleCalendar';
@@ -16,6 +17,7 @@ function needsSummary(text: string): boolean {
 }
 
 export async function GET(request: NextRequest) {
+  await ensureMigrated();
   const status = request.nextUrl.searchParams.get('status') ?? 'active';
   const db = getDb();
 
@@ -33,6 +35,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  await ensureMigrated();
   const form = await request.formData();
   const text = form.get('text');
   if (typeof text !== 'string' || !text.trim()) {
