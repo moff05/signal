@@ -16,6 +16,7 @@ export type SignalRow = {
   created_at: string;
   completed_at: string | null;
   deleted_at: string | null;
+  sort_order: number | null;
 };
 
 // Someday items have no date, so they always sink below anything with one —

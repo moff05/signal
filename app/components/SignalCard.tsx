@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { Check, Pencil, Trash2, Flag, AlertTriangle, MoreHorizontal, X, ChevronDown } from 'lucide-react';
+import { Check, Pencil, Trash2, Flag, AlertTriangle, MoreHorizontal, X, ChevronDown, ChevronUp } from 'lucide-react';
 import { isAutoUrgent, type SignalRow } from '@/lib/urgency';
 import { formatSignalDate } from '@/lib/format';
 
@@ -18,9 +18,12 @@ type Props = {
   onEdit: (signal: SignalRow) => void;
   onDelete: (id: string) => void;
   style?: React.CSSProperties;
+  // Only meaningful within Today's Signal — the backlog stays purely
+  // urgency-sorted, so these are omitted entirely for backlog/search cards.
+  reorder?: { canMoveUp: boolean; canMoveDown: boolean; onMoveUp: () => void; onMoveDown: () => void };
 };
 
-export default function SignalCard({ signal, onToggleSignal, onMarkDone, onEdit, onDelete, style }: Props) {
+export default function SignalCard({ signal, onToggleSignal, onMarkDone, onEdit, onDelete, style, reorder }: Props) {
   const dateLabel = formatSignalDate(signal);
   const urgent = isAutoUrgent(signal);
   const inSignal = Boolean(signal.is_today_signal);
@@ -190,6 +193,38 @@ export default function SignalCard({ signal, onToggleSignal, onMarkDone, onEdit,
         >
           <div className="overflow-hidden">
             <div className="mt-3 flex gap-2 border-t pt-3" style={{ borderColor: 'var(--border)' }}>
+              {reorder && (
+                <>
+                  <button
+                    type="button"
+                    disabled={!reorder.canMoveUp}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      reorder.onMoveUp();
+                    }}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    aria-label="Move up in today's Signal"
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg active:scale-95 disabled:opacity-30"
+                    style={{ background: 'var(--accent-soft)', color: 'var(--accent)' }}
+                  >
+                    <ChevronUp size={16} strokeWidth={2.5} />
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!reorder.canMoveDown}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      reorder.onMoveDown();
+                    }}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    aria-label="Move down in today's Signal"
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg active:scale-95 disabled:opacity-30"
+                    style={{ background: 'var(--accent-soft)', color: 'var(--accent)' }}
+                  >
+                    <ChevronDown size={16} strokeWidth={2.5} />
+                  </button>
+                </>
+              )}
               <button
                 onClick={(e) => {
                   e.stopPropagation();

@@ -2,8 +2,9 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import Link from 'next/link';
-import { Plus, Radio, Archive, Flag, Settings, Search, X, AlertTriangle } from 'lucide-react';
-import type { SignalRow } from '@/lib/urgency';
+import { Plus, Radio, Archive, Flag, Settings, Search, X, AlertTriangle, Flame } from 'lucide-react';
+import { urgencyScore, type SignalRow } from '@/lib/urgency';
+import { computeStreakStats } from '@/lib/streak';
 import SignalCard from '@/app/components/SignalCard';
 import SignalSheet from '@/app/components/SignalSheet';
 
@@ -15,6 +16,7 @@ export default function Home() {
   const [query, setQuery] = useState('');
   const [actionError, setActionError] = useState<string | null>(null);
   const errorTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [streak, setStreak] = useState<ReturnType<typeof computeStreakStats> | null>(null);
 
   // Optimistic updates apply instantly; a failed request quietly looked
   // identical to a successful one before this. Roll back to the pre-action
@@ -27,19 +29,21 @@ export default function Home() {
   }
 
   const load = useCallback(async () => {
-    const res = await fetch('/api/signals');
-    const data = await res.json();
-    setSignals(data.signals ?? []);
+    const [activeRes, doneRes] = await Promise.all([fetch('/api/signals'), fetch('/api/signals?status=done')]);
+    const [activeData, doneData] = await Promise.all([activeRes.json(), doneRes.json()]);
+    setSignals(activeData.signals ?? []);
+    setStreak(computeStreakStats(doneData.signals ?? []));
     setLoading(false);
   }, []);
 
   useEffect(() => {
     let ignore = false;
     (async () => {
-      const res = await fetch('/api/signals');
-      const data = await res.json();
+      const [activeRes, doneRes] = await Promise.all([fetch('/api/signals'), fetch('/api/signals?status=done')]);
+      const [activeData, doneData] = await Promise.all([activeRes.json(), doneRes.json()]);
       if (!ignore) {
-        setSignals(data.signals ?? []);
+        setSignals(activeData.signals ?? []);
+        setStreak(computeStreakStats(doneData.signals ?? []));
         setLoading(false);
       }
     })();
@@ -73,6 +77,44 @@ export default function Home() {
     if (!res.ok) {
       setSignals(prev);
       flagError("Couldn't mark done — try again.");
+      return;
+    }
+    // Completing something can move the streak — refresh just that, not the
+    // whole active list (already updated optimistically above).
+    const doneData = await (await fetch('/api/signals?status=done')).json();
+    setStreak(computeStreakStats(doneData.signals ?? []));
+  }
+
+  // Re-numbers the current visual order into clean sequential integers and
+  // persists all of it — simpler and more robust than tracking incremental
+  // diffs, and cheap since today's Signal is only ever a handful of items.
+  async function moveInToday(id: string, direction: 'up' | 'down') {
+    const ordered = [...todaysSignal];
+    const idx = ordered.findIndex((s) => s.id === id);
+    const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (idx === -1 || swapIdx < 0 || swapIdx >= ordered.length) return;
+    [ordered[idx], ordered[swapIdx]] = [ordered[swapIdx], ordered[idx]];
+
+    const updates = ordered.map((s, i) => ({ id: s.id, sort_order: i }));
+    const prev = signals;
+    setSignals((p) =>
+      p.map((s) => {
+        const u = updates.find((x) => x.id === s.id);
+        return u ? { ...s, sort_order: u.sort_order } : s;
+      })
+    );
+    const results = await Promise.all(
+      updates.map((u) =>
+        fetch(`/api/signals/${u.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sort_order: u.sort_order }),
+        })
+      )
+    );
+    if (results.some((r) => !r.ok)) {
+      setSignals(prev);
+      flagError("Couldn't reorder — try again.");
     }
   }
 
@@ -115,7 +157,17 @@ export default function Home() {
     ? signals.filter((s) => s.text.toLowerCase().includes(trimmedQuery) || (s.details ?? '').toLowerCase().includes(trimmedQuery))
     : null;
 
-  const todaysSignal = signals.filter((s) => s.is_today_signal);
+  // Manually reordered items sort by that order; anything never touched
+  // (sort_order null) falls back to computed urgency and sinks after any
+  // manually-positioned items — matches how a fresh flag lands at the end.
+  const todaysSignal = signals
+    .filter((s) => s.is_today_signal)
+    .sort((a, b) => {
+      if (a.sort_order != null && b.sort_order != null) return a.sort_order - b.sort_order;
+      if (a.sort_order != null) return -1;
+      if (b.sort_order != null) return 1;
+      return urgencyScore(b) - urgencyScore(a);
+    });
   const rest = signals.filter((s) => !s.is_today_signal);
   let cardIndex = 0;
 
@@ -145,6 +197,17 @@ export default function Home() {
           </Link>
         </div>
       </header>
+
+      {!loading && streak && (streak.current > 0 || streak.weekCount > 0) && (
+        <div className="mb-4 flex items-center gap-2.5 text-sm" style={{ color: 'var(--text-muted)' }}>
+          <span className="flex items-center gap-1">
+            <Flame size={14} strokeWidth={2.25} style={{ color: streak.current > 0 ? 'var(--signal)' : 'var(--text-muted)' }} />
+            {streak.current > 0 ? `${streak.current} day streak` : 'No streak yet'}
+          </span>
+          <span aria-hidden="true">·</span>
+          <span>{streak.weekCount}/7 this week</span>
+        </div>
+      )}
 
       {actionError && (
         <div
@@ -220,7 +283,7 @@ export default function Home() {
               Today&apos;s signal
             </h2>
             {todaysSignal.length > 0 ? (
-              todaysSignal.map((s) => (
+              todaysSignal.map((s, i) => (
                 <SignalCard
                   key={s.id}
                   signal={s}
@@ -229,6 +292,16 @@ export default function Home() {
                   onEdit={openEdit}
                   onDelete={deleteSignal}
                   style={{ animationDelay: `${cardIndex++ * 40}ms` }}
+                  reorder={
+                    todaysSignal.length > 1
+                      ? {
+                          canMoveUp: i > 0,
+                          canMoveDown: i < todaysSignal.length - 1,
+                          onMoveUp: () => moveInToday(s.id, 'up'),
+                          onMoveDown: () => moveInToday(s.id, 'down'),
+                        }
+                      : undefined
+                  }
                 />
               ))
             ) : (

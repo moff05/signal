@@ -3,9 +3,10 @@
 import { useEffect, useMemo, useState, useRef } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, RotateCcw, Trash2, Archive as ArchiveIcon, AlertTriangle } from 'lucide-react';
-import { subDays, isSameDay, format } from 'date-fns';
+import { format } from 'date-fns';
 import type { SignalRow } from '@/lib/urgency';
 import { formatCompletedDate, formatRemovedDate } from '@/lib/format';
+import { computeStreakStats } from '@/lib/streak';
 
 export default function ArchivePage() {
   const [items, setItems] = useState<SignalRow[]>([]);
@@ -36,13 +37,7 @@ export default function ArchivePage() {
     };
   }, []);
 
-  const streak = useMemo(() => {
-    const days = Array.from({ length: 7 }, (_, i) => subDays(new Date(), 6 - i));
-    return days.map((day) => ({
-      day,
-      hit: items.some((item) => item.status === 'done' && item.completed_at && isSameDay(new Date(item.completed_at), day)),
-    }));
-  }, [items]);
+  const streak = useMemo(() => computeStreakStats(items), [items]);
 
   async function restore(id: string) {
     const prev = items;
@@ -90,19 +85,25 @@ export default function ArchivePage() {
       )}
 
       {!loading && items.length > 0 && (
-        <div className="mb-6 flex items-center justify-between rounded-xl border p-3" style={{ borderColor: 'var(--border)', background: 'var(--surface)' }}>
-          {streak.map(({ day, hit }) => (
-            <div key={day.toISOString()} className="flex flex-col items-center gap-1.5">
-              <span className="text-[10px] font-medium uppercase" style={{ color: 'var(--text-muted)' }}>
-                {format(day, 'EEEEE')}
-              </span>
-              <div
-                className="h-2.5 w-2.5 rounded-full"
-                style={{ background: hit ? 'var(--signal)' : 'var(--border)' }}
-                aria-label={hit ? `Completed something on ${format(day, 'EEE MMM d')}` : undefined}
-              />
-            </div>
-          ))}
+        <div className="mb-6 rounded-xl border p-3" style={{ borderColor: 'var(--border)', background: 'var(--surface)' }}>
+          <div className="flex items-center justify-between">
+            {streak.week.map(({ day, hit }) => (
+              <div key={day.toISOString()} className="flex flex-col items-center gap-1.5">
+                <span className="text-[10px] font-medium uppercase" style={{ color: 'var(--text-muted)' }}>
+                  {format(day, 'EEEEE')}
+                </span>
+                <div
+                  className="h-2.5 w-2.5 rounded-full"
+                  style={{ background: hit ? 'var(--signal)' : 'var(--border)' }}
+                  aria-label={hit ? `Completed something on ${format(day, 'EEE MMM d')}` : `No completion on ${format(day, 'EEE MMM d')}`}
+                />
+              </div>
+            ))}
+          </div>
+          <p className="mt-3 text-center text-xs" style={{ color: 'var(--text-muted)' }}>
+            {streak.current > 0 ? `${streak.current} day streak · ` : ''}
+            {streak.weekCount} of the last 7 days
+          </p>
         </div>
       )}
 

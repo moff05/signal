@@ -21,7 +21,8 @@ export async function runMigrations(db: ReturnType<typeof getDb>) {
       repeat TEXT NOT NULL DEFAULT 'none' CHECK(repeat IN ('none','weekly','monthly')),
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       completed_at TEXT,
-      deleted_at TEXT
+      deleted_at TEXT,
+      sort_order INTEGER
     )
   `);
 
@@ -53,6 +54,13 @@ export async function runMigrations(db: ReturnType<typeof getDb>) {
     await db.execute(`ALTER TABLE signals ADD COLUMN deleted_at TEXT`);
   }
 
+  // Manual ordering within today's Signal only — null until the user actually
+  // reorders, at which point it's the sole ordering key for that subset. The
+  // backlog stays purely urgency-sorted, untouched by this column.
+  if (!(await columnExists(db, 'signals', 'sort_order'))) {
+    await db.execute(`ALTER TABLE signals ADD COLUMN sort_order INTEGER`);
+  }
+
   // Delete used to be instant and permanent — a mis-tap destroyed a note with
   // no recovery, unlike Done (which lands in a restorable Archive). Widening
   // the status enum to include 'deleted' makes Delete a soft-delete too.
@@ -78,12 +86,13 @@ export async function runMigrations(db: ReturnType<typeof getDb>) {
         repeat TEXT NOT NULL DEFAULT 'none' CHECK(repeat IN ('none','weekly','monthly')),
         created_at TEXT NOT NULL DEFAULT (datetime('now')),
         completed_at TEXT,
-        deleted_at TEXT
+        deleted_at TEXT,
+        sort_order INTEGER
       )
     `);
     await db.execute(`
-      INSERT INTO signals (id, text, attachment_url, type, event_datetime, due_date, is_today_signal, status, gcal_event_id, details, repeat, created_at, completed_at, deleted_at)
-      SELECT id, text, attachment_url, type, event_datetime, due_date, is_today_signal, status, gcal_event_id, details, repeat, created_at, completed_at, deleted_at
+      INSERT INTO signals (id, text, attachment_url, type, event_datetime, due_date, is_today_signal, status, gcal_event_id, details, repeat, created_at, completed_at, deleted_at, sort_order)
+      SELECT id, text, attachment_url, type, event_datetime, due_date, is_today_signal, status, gcal_event_id, details, repeat, created_at, completed_at, deleted_at, sort_order
       FROM signals_old
     `);
     await db.execute(`DROP TABLE signals_old`);

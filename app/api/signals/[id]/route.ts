@@ -4,7 +4,9 @@ import { ensureMigrated } from '@/lib/ensureMigrated';
 import { saveAttachment } from '@/lib/attachments';
 import { pushToGoogleCalendar, updateGoogleCalendarEvent, deleteGoogleCalendarEvent } from '@/lib/googleCalendar';
 import { advanceDate, advanceDueDate } from '@/lib/repeat';
-import type { RepeatInterval } from '@/lib/urgency';
+import { computeStreakStats, nextMilestoneHit } from '@/lib/streak';
+import { sendPushToAll } from '@/lib/webPush';
+import type { RepeatInterval, SignalRow } from '@/lib/urgency';
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -31,6 +33,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   let isTodaySignal: number;
   let status: string;
   let repeat: RepeatInterval;
+  let sortOrder: number | null;
   let attachmentUrl: string | null | undefined; // undefined = leave unchanged
 
   if (isFormData) {
@@ -43,6 +46,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     isTodaySignal = existing.is_today_signal as number;
     status = existing.status as string;
     repeat = normalizeRepeat(form.get('repeat'), existing.repeat as RepeatInterval);
+    sortOrder = existing.sort_order as number | null;
 
     const attachment = form.get('attachment');
     if (attachment instanceof File && attachment.size > 0) {
@@ -60,6 +64,9 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     isTodaySignal = typeof body.is_today_signal === 'boolean' ? (body.is_today_signal ? 1 : 0) : (existing.is_today_signal as number);
     status = body.status === 'done' || body.status === 'active' || body.status === 'deleted' ? body.status : (existing.status as string);
     repeat = normalizeRepeat(body.repeat, existing.repeat as RepeatInterval);
+    // Leaving today's Signal clears any manual position — re-flagging later
+    // starts fresh at the end rather than resurrecting a stale slot.
+    sortOrder = 'sort_order' in body ? body.sort_order : isTodaySignal === 0 ? null : (existing.sort_order as number | null);
     attachmentUrl = undefined;
   }
 
@@ -70,7 +77,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   const deletedAt = justDeleted ? new Date().toISOString() : status !== 'deleted' ? null : existing.deleted_at;
 
   await db.execute({
-    sql: `UPDATE signals SET text = ?, type = ?, event_datetime = ?, due_date = ?, is_today_signal = ?, status = ?, completed_at = ?, deleted_at = ?, repeat = ?${attachmentUrl !== undefined ? ', attachment_url = ?' : ''}
+    sql: `UPDATE signals SET text = ?, type = ?, event_datetime = ?, due_date = ?, is_today_signal = ?, status = ?, completed_at = ?, deleted_at = ?, repeat = ?, sort_order = ?${attachmentUrl !== undefined ? ', attachment_url = ?' : ''}
           WHERE id = ?`,
     args: [
       text,
@@ -82,6 +89,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       completedAt,
       deletedAt,
       type === 'someday' ? 'none' : repeat,
+      sortOrder,
       ...(attachmentUrl !== undefined ? [attachmentUrl] : []),
       id,
     ],
@@ -127,6 +135,24 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       if (gcalEventId) {
         await db.execute({ sql: 'UPDATE signals SET gcal_event_id = ? WHERE id = ?', args: [gcalEventId, newId] });
       }
+    }
+  }
+
+  // A rare, positive ping at real milestones — the daily reminder cron is all
+  // stick ("you haven't picked today's Signal"); this is the one carrot,
+  // fired right at the moment it's earned rather than on a fixed schedule.
+  // Best-effort: a missing VAPID config or a send failure must never block
+  // the actual completion this request exists to record.
+  if (justCompleted) {
+    try {
+      const doneRows = await db.execute(`SELECT status, completed_at FROM signals WHERE status = 'done'`);
+      const stats = computeStreakStats(doneRows.rows as unknown as SignalRow[]);
+      const milestone = nextMilestoneHit(stats.current);
+      if (milestone) {
+        await sendPushToAll({ title: `${milestone}-day streak`, body: `You've completed a signal ${milestone} days in a row.` });
+      }
+    } catch (err) {
+      console.error('Milestone push failed:', err);
     }
   }
 
