@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { Check, Inbox, CalendarClock, CalendarCheck, Paperclip, Sparkles, Repeat, X } from 'lucide-react';
+import { Check, Inbox, CalendarClock, CalendarCheck, Paperclip, Sparkles, Repeat, Clock, X } from 'lucide-react';
 import type { SignalRow, RepeatInterval } from '@/lib/urgency';
 
 type DateMode = 'none' | 'deadline' | 'fixed_time';
@@ -17,7 +17,7 @@ type Props = {
 
 const DATE_MODES: { mode: DateMode; label: string; icon: typeof Inbox; helper: string }[] = [
   { mode: 'none', label: 'Someday', icon: Inbox, helper: 'No date — sits in your backlog until you’re ready.' },
-  { mode: 'deadline', label: 'Deadline', icon: CalendarClock, helper: 'Automatically turns urgent as the date gets close.' },
+  { mode: 'deadline', label: 'Deadline', icon: CalendarClock, helper: 'Automatically turns urgent as the date gets close. No time set means end of day.' },
   { mode: 'fixed_time', label: 'Specific time', icon: CalendarCheck, helper: 'Fixed time — connect Google Calendar in Settings to also push it there.' },
 ];
 
@@ -43,6 +43,9 @@ export default function SignalSheet({ initial, onClose, onSaved }: Props) {
   }
   const [dateMode, setDateMode] = useState<DateMode>(initial?.type === 'fixed_time' ? 'fixed_time' : initial?.type === 'deadline' ? 'deadline' : 'none');
   const [dueDate, setDueDate] = useState(initial?.due_date?.slice(0, 10) ?? '');
+  // due_date is "YYYY-MM-DD" with no time chosen, or "YYYY-MM-DDTHH:MM" when
+  // it was — pull the time portion back out for editing.
+  const [dueTime, setDueTime] = useState((initial?.due_date?.length ?? 0) > 10 ? initial!.due_date!.slice(11, 16) : '');
   const [eventDatetime, setEventDatetime] = useState(toLocalInputValue(initial?.event_datetime ?? null));
   const [repeat, setRepeat] = useState<RepeatInterval>(initial?.repeat ?? 'none');
   const [file, setFile] = useState<File | null>(null);
@@ -56,12 +59,14 @@ export default function SignalSheet({ initial, onClose, onSaved }: Props) {
     setSaving(true);
     setError(null);
 
+    const combinedDueDate = dueTime ? `${dueDate}T${dueTime}` : dueDate;
+
     try {
       if (isEdit && initial) {
         const form = new FormData();
         form.set('text', text);
         form.set('event_datetime', dateMode === 'fixed_time' && eventDatetime ? new Date(eventDatetime).toISOString() : '');
-        form.set('due_date', dateMode === 'deadline' && dueDate ? dueDate : '');
+        form.set('due_date', dateMode === 'deadline' && dueDate ? combinedDueDate : '');
         form.set('repeat', dateMode === 'none' ? 'none' : repeat);
         if (file) form.set('attachment', file);
         else if (removeAttachment) form.set('remove_attachment', 'true');
@@ -72,7 +77,7 @@ export default function SignalSheet({ initial, onClose, onSaved }: Props) {
         const form = new FormData();
         form.set('text', text);
         if (dateMode === 'fixed_time' && eventDatetime) form.set('event_datetime', new Date(eventDatetime).toISOString());
-        if (dateMode === 'deadline' && dueDate) form.set('due_date', dueDate);
+        if (dateMode === 'deadline' && dueDate) form.set('due_date', combinedDueDate);
         if (dateMode !== 'none') form.set('repeat', repeat);
         if (file) form.set('attachment', file);
 
@@ -179,16 +184,39 @@ export default function SignalSheet({ initial, onClose, onSaved }: Props) {
         </p>
 
         {dateMode === 'deadline' && (
-          <div className="mb-1 flex items-center gap-2 rounded-lg border px-3" style={{ borderColor: 'var(--border)', background: 'var(--bg)' }}>
-            <CalendarClock size={16} strokeWidth={2} style={{ color: 'var(--text-muted)' }} />
-            <input
-              type="date"
-              value={dueDate}
-              onChange={(e) => setDueDate(e.target.value)}
-              aria-label="Due date"
-              className="w-full bg-transparent py-2.5"
-            />
-          </div>
+          <>
+            <div className="mb-1 flex items-center gap-2 rounded-lg border px-3" style={{ borderColor: 'var(--border)', background: 'var(--bg)' }}>
+              <CalendarClock size={16} strokeWidth={2} style={{ color: 'var(--text-muted)' }} />
+              <input
+                type="date"
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
+                aria-label="Due date"
+                className="w-full bg-transparent py-2.5"
+              />
+            </div>
+            <div className="mb-1 flex items-center gap-2 rounded-lg border px-3" style={{ borderColor: 'var(--border)', background: 'var(--bg)' }}>
+              <Clock size={16} strokeWidth={2} style={{ color: 'var(--text-muted)' }} />
+              <input
+                type="time"
+                value={dueTime}
+                onChange={(e) => setDueTime(e.target.value)}
+                aria-label="Due time (optional)"
+                className="w-full bg-transparent py-2.5"
+              />
+              {dueTime && (
+                <button
+                  type="button"
+                  onClick={() => setDueTime('')}
+                  aria-label="Clear time"
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full"
+                  style={{ color: 'var(--text-muted)' }}
+                >
+                  <X size={14} strokeWidth={2.25} />
+                </button>
+              )}
+            </div>
+          </>
         )}
 
         {dateMode === 'fixed_time' && (

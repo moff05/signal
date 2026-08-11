@@ -22,13 +22,25 @@ export type SignalRow = {
 // this constant just needs to be lower than any realistic -hoursUntil value.
 const SOMEDAY_SCORE = -1e9;
 
+// due_date is either a bare "YYYY-MM-DD" (no time chosen) or a full
+// "YYYY-MM-DDTHH:MM" (an optional time was set in the sheet). A bare date
+// string is parsed by JS as UTC midnight — often hours before local midnight,
+// and always the literal start of the day rather than what "due tomorrow"
+// actually means. Treat a date with no time as due at the end of that day,
+// local time, so "tomorrow" doesn't count as already-basically-here.
+export function parseDueDate(dueDate: string): Date {
+  return dueDate.length === 10 ? new Date(`${dueDate}T23:59:59`) : new Date(dueDate);
+}
+
 // Higher score = more urgent = sorted first. Overdue/imminent dated items
 // score highest; someday items float at the bottom regardless of how old
 // they are, since "no date" should never accidentally out-rank a real date.
 export function urgencyScore(row: SignalRow, now: Date = new Date()): number {
-  const relevantDate = row.type === 'someday' ? null : row.type === 'fixed_time' ? row.event_datetime : row.due_date;
+  if (row.type === 'someday') return SOMEDAY_SCORE;
+  const relevantDate = row.type === 'fixed_time' ? row.event_datetime : row.due_date;
   if (!relevantDate) return SOMEDAY_SCORE;
-  const hoursUntil = (new Date(relevantDate).getTime() - now.getTime()) / (1000 * 60 * 60);
+  const date = row.type === 'deadline' ? parseDueDate(relevantDate) : new Date(relevantDate);
+  const hoursUntil = (date.getTime() - now.getTime()) / (1000 * 60 * 60);
   return -hoursUntil;
 }
 
@@ -41,7 +53,7 @@ export function isAutoUrgent(row: SignalRow, now: Date = new Date()): boolean {
     return hoursUntil <= 24;
   }
   if (row.type === 'deadline' && row.due_date) {
-    const hoursUntil = (new Date(row.due_date).getTime() - now.getTime()) / (1000 * 60 * 60);
+    const hoursUntil = (parseDueDate(row.due_date).getTime() - now.getTime()) / (1000 * 60 * 60);
     return hoursUntil <= 48;
   }
   return false;

@@ -3,7 +3,7 @@ import { getDb } from '@/lib/db';
 import { ensureMigrated } from '@/lib/ensureMigrated';
 import { saveAttachment } from '@/lib/attachments';
 import { pushToGoogleCalendar, updateGoogleCalendarEvent, deleteGoogleCalendarEvent } from '@/lib/googleCalendar';
-import { advanceDate } from '@/lib/repeat';
+import { advanceDate, advanceDueDate } from '@/lib/repeat';
 import type { RepeatInterval } from '@/lib/urgency';
 
 type Params = { params: Promise<{ id: string }> };
@@ -114,7 +114,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   if (justCompleted && repeat !== 'none' && (type === 'deadline' || type === 'fixed_time')) {
     const newId = crypto.randomUUID();
     const newEventDatetime = type === 'fixed_time' && eventDatetime ? advanceDate(eventDatetime, repeat) : null;
-    const newDueDate = type === 'deadline' && dueDate ? advanceDate(dueDate, repeat).slice(0, 10) : null;
+    const newDueDate = type === 'deadline' && dueDate ? advanceDueDate(dueDate, repeat) : null;
 
     await db.execute({
       sql: `INSERT INTO signals (id, text, type, event_datetime, due_date, repeat)
