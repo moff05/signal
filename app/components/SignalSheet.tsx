@@ -278,7 +278,7 @@ export default function SignalSheet({ initial, onClose, onSaved }: Props) {
             type="submit"
             disabled={saving || !text.trim()}
             className="flex flex-1 items-center justify-center gap-1.5 rounded-lg py-3 font-medium text-white transition-transform active:scale-95 disabled:opacity-50"
-            style={{ background: 'var(--accent-fill)', boxShadow: '0 8px 24px -10px var(--accent)' }}
+            style={{ background: 'var(--accent-fill)', boxShadow: '0 8px 24px -10px var(--accent-fill)' }}
           >
             {saving ? 'Saving…' : (
               <>

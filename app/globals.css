@@ -83,6 +83,14 @@ select:focus-visible {
   outline-offset: 2px;
 }
 
+/* --accent-hi (not --accent) so a focused chip reads distinctly from a
+   selected one — both would otherwise render the exact same blue. */
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--accent-hi);
+  outline-offset: 2px;
+}
+
 button {
   cursor: pointer;
 }

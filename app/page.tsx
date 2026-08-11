@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import Link from 'next/link';
-import { Plus, Radio, Archive, Flag, Settings, Search, X } from 'lucide-react';
+import { Plus, Radio, Archive, Flag, Settings, Search, X, AlertTriangle } from 'lucide-react';
 import type { SignalRow } from '@/lib/urgency';
 import SignalCard from '@/app/components/SignalCard';
 import SignalSheet from '@/app/components/SignalSheet';
@@ -13,6 +13,18 @@ export default function Home() {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editing, setEditing] = useState<SignalRow | null>(null);
   const [query, setQuery] = useState('');
+  const [actionError, setActionError] = useState<string | null>(null);
+  const errorTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Optimistic updates apply instantly; a failed request quietly looked
+  // identical to a successful one before this. Roll back to the pre-action
+  // state and say so — silence here is exactly the failure mode this app
+  // exists to eliminate.
+  function flagError(message: string) {
+    setActionError(message);
+    if (errorTimeout.current) clearTimeout(errorTimeout.current);
+    errorTimeout.current = setTimeout(() => setActionError(null), 4000);
+  }
 
   const load = useCallback(async () => {
     const res = await fetch('/api/signals');
@@ -37,30 +49,45 @@ export default function Home() {
   }, []);
 
   async function toggleSignal(id: string, next: boolean) {
-    setSignals((prev) => prev.map((s) => (s.id === id ? { ...s, is_today_signal: next ? 1 : 0 } : s)));
-    await fetch(`/api/signals/${id}`, {
+    const prev = signals;
+    setSignals((p) => p.map((s) => (s.id === id ? { ...s, is_today_signal: next ? 1 : 0 } : s)));
+    const res = await fetch(`/api/signals/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ is_today_signal: next }),
     });
+    if (!res.ok) {
+      setSignals(prev);
+      flagError("Couldn't update — try again.");
+    }
   }
 
   async function markDone(id: string) {
-    setSignals((prev) => prev.filter((s) => s.id !== id));
-    await fetch(`/api/signals/${id}`, {
+    const prev = signals;
+    setSignals((p) => p.filter((s) => s.id !== id));
+    const res = await fetch(`/api/signals/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: 'done' }),
     });
+    if (!res.ok) {
+      setSignals(prev);
+      flagError("Couldn't mark done — try again.");
+    }
   }
 
   async function deleteSignal(id: string) {
-    setSignals((prev) => prev.filter((s) => s.id !== id));
-    await fetch(`/api/signals/${id}`, {
+    const prev = signals;
+    setSignals((p) => p.filter((s) => s.id !== id));
+    const res = await fetch(`/api/signals/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: 'deleted' }),
     });
+    if (!res.ok) {
+      setSignals(prev);
+      flagError("Couldn't delete — try again.");
+    }
   }
 
   function openEdit(signal: SignalRow) {
@@ -118,6 +145,17 @@ export default function Home() {
           </Link>
         </div>
       </header>
+
+      {actionError && (
+        <div
+          role="alert"
+          className="mb-4 flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm"
+          style={{ background: 'var(--urgent-soft)', color: 'var(--urgent)' }}
+        >
+          <AlertTriangle size={14} strokeWidth={2.5} />
+          {actionError}
+        </div>
+      )}
 
       {!loading && signals.length > 8 && (
         <div className="relative mb-4">
@@ -228,7 +266,7 @@ export default function Home() {
         style={{
           background: 'var(--accent-fill)',
           bottom: 'calc(env(safe-area-inset-bottom) + 1.5rem)',
-          boxShadow: '0 10px 30px -8px var(--accent)',
+          boxShadow: '0 10px 30px -8px var(--accent-fill)',
         }}
       >
         <Plus size={18} strokeWidth={2.5} />

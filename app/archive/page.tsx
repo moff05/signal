@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, RotateCcw, Trash2, Archive as ArchiveIcon } from 'lucide-react';
+import { ArrowLeft, RotateCcw, Trash2, Archive as ArchiveIcon, AlertTriangle } from 'lucide-react';
 import { subDays, isSameDay, format } from 'date-fns';
 import type { SignalRow } from '@/lib/urgency';
 import { formatCompletedDate, formatRemovedDate } from '@/lib/format';
@@ -10,6 +10,14 @@ import { formatCompletedDate, formatRemovedDate } from '@/lib/format';
 export default function ArchivePage() {
   const [items, setItems] = useState<SignalRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const errorTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function flagError(message: string) {
+    setActionError(message);
+    if (errorTimeout.current) clearTimeout(errorTimeout.current);
+    errorTimeout.current = setTimeout(() => setActionError(null), 4000);
+  }
 
   useEffect(() => {
     let ignore = false;
@@ -37,17 +45,28 @@ export default function ArchivePage() {
   }, [items]);
 
   async function restore(id: string) {
-    setItems((prev) => prev.filter((s) => s.id !== id));
-    await fetch(`/api/signals/${id}`, {
+    const prev = items;
+    setItems((p) => p.filter((s) => s.id !== id));
+    const res = await fetch(`/api/signals/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: 'active' }),
     });
+    if (!res.ok) {
+      setItems(prev);
+      flagError("Couldn't restore — try again.");
+    }
   }
 
-  async function deleteForever(id: string) {
-    setItems((prev) => prev.filter((s) => s.id !== id));
-    await fetch(`/api/signals/${id}`, { method: 'DELETE' });
+  async function deleteForever(id: string, text: string) {
+    if (!window.confirm(`Delete "${text}" forever? This can't be undone.`)) return;
+    const prev = items;
+    setItems((p) => p.filter((s) => s.id !== id));
+    const res = await fetch(`/api/signals/${id}`, { method: 'DELETE' });
+    if (!res.ok) {
+      setItems(prev);
+      flagError("Couldn't delete — try again.");
+    }
   }
 
   return (
@@ -58,6 +77,17 @@ export default function ArchivePage() {
         </Link>
         <h1 className="text-xl font-semibold tracking-tight">Archive</h1>
       </header>
+
+      {actionError && (
+        <div
+          role="alert"
+          className="mb-4 flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm"
+          style={{ background: 'var(--urgent-soft)', color: 'var(--urgent)' }}
+        >
+          <AlertTriangle size={14} strokeWidth={2.5} />
+          {actionError}
+        </div>
+      )}
 
       {!loading && items.length > 0 && (
         <div className="mb-6 flex items-center justify-between rounded-xl border p-3" style={{ borderColor: 'var(--border)', background: 'var(--surface)' }}>
@@ -114,9 +144,9 @@ export default function ArchivePage() {
                 </button>
                 <button
                   aria-label="Delete forever"
-                  onClick={() => deleteForever(item.id)}
+                  onClick={() => deleteForever(item.id, item.text)}
                   className="flex h-11 w-11 items-center justify-center rounded-full transition-transform active:scale-90"
-                  style={{ color: 'var(--text-muted)' }}
+                  style={{ color: 'var(--urgent)', background: 'var(--urgent-soft)' }}
                 >
                   <Trash2 size={16} strokeWidth={2} />
                 </button>
