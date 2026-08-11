@@ -191,7 +191,11 @@ export default function SignalCard({ signal, onToggleSignal, onMarkDone, onEdit,
           <div className="overflow-hidden">
             <div className="mt-3 flex gap-2 border-t pt-3" style={{ borderColor: 'var(--border)' }}>
               <button
-                onClick={() => exitThen('right', () => onMarkDone(signal.id))}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  exitThen('right', () => onMarkDone(signal.id));
+                }}
+                onPointerDown={(e) => e.stopPropagation()}
                 className="flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-sm font-medium active:scale-95"
                 style={{ background: 'var(--signal-soft)', color: 'var(--signal)' }}
               >
@@ -199,10 +203,12 @@ export default function SignalCard({ signal, onToggleSignal, onMarkDone, onEdit,
                 Done
               </button>
               <button
-                onClick={() => {
+                onClick={(e) => {
+                  e.stopPropagation();
                   onEdit(signal);
                   setMenuOpen(false);
                 }}
+                onPointerDown={(e) => e.stopPropagation()}
                 className="flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-sm font-medium active:scale-95"
                 style={{ background: 'var(--accent-soft)', color: 'var(--accent)' }}
               >
@@ -210,7 +216,11 @@ export default function SignalCard({ signal, onToggleSignal, onMarkDone, onEdit,
                 Edit
               </button>
               <button
-                onClick={() => exitThen('left', () => onDelete(signal.id))}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  exitThen('left', () => onDelete(signal.id));
+                }}
+                onPointerDown={(e) => e.stopPropagation()}
                 className="flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-sm font-medium active:scale-95"
                 style={{ background: 'var(--urgent-soft)', color: 'var(--urgent)' }}
               >
