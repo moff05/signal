@@ -18,20 +18,27 @@ async function fetchSignals() {
   req.timeoutInterval = 10;
   try {
     const data = await req.loadJSON();
-    return data.signals ?? [];
+    return { signals: data.signals ?? [], streak: data.streak ?? 0 };
   } catch {
-    return null;
+    return { signals: null, streak: 0 };
   }
 }
 
-function buildWidget(signals) {
+function buildWidget(signals, streak) {
   const widget = new ListWidget();
   widget.backgroundColor = new Color("#0a0a0a");
   widget.url = "https://signal-drab-omega.vercel.app";
 
-  const title = widget.addText("SIGNAL");
+  const header = widget.addStack();
+  const title = header.addText("SIGNAL");
   title.font = Font.boldSystemFont(12);
   title.textColor = new Color("#22c55e");
+  if (streak > 0) {
+    header.addSpacer();
+    const streakText = header.addText(`🔥${streak}`);
+    streakText.font = Font.systemFont(11);
+    streakText.textColor = new Color("#9ca3af");
+  }
   widget.addSpacer(6);
 
   if (signals === null) {
@@ -67,8 +74,8 @@ function buildWidget(signals) {
   return widget;
 }
 
-const signals = await fetchSignals();
-const widget = buildWidget(signals);
+const { signals, streak } = await fetchSignals();
+const widget = buildWidget(signals, streak);
 
 if (config.runsInWidget) {
   Script.setWidget(widget);

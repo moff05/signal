@@ -4,6 +4,7 @@ import { ensureMigrated } from '@/lib/ensureMigrated';
 import { isValidWidgetToken } from '@/lib/auth';
 import { sortSignals, type SignalRow } from '@/lib/urgency';
 import { formatSignalDate } from '@/lib/format';
+import { computeStreakStats } from '@/lib/streak';
 
 // Public route (excluded from proxy auth) — guarded by its own long-lived
 // token instead, since the Scriptable widget can't do a cookie-based login.
@@ -27,5 +28,8 @@ export async function GET(request: NextRequest) {
     dateLabel: formatSignalDate(row),
   }));
 
-  return NextResponse.json({ signals });
+  const doneRows = await db.execute(`SELECT status, completed_at FROM signals WHERE status = 'done'`);
+  const streak = computeStreakStats(doneRows.rows as unknown as SignalRow[]).current;
+
+  return NextResponse.json({ signals, streak });
 }
