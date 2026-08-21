@@ -35,7 +35,13 @@ function buildWidget(signals, streak) {
   title.textColor = new Color("#22c55e");
   if (streak > 0) {
     header.addSpacer();
-    const streakText = header.addText(`🔥${streak}`);
+    const flame = SFSymbol.named("flame.fill");
+    flame.applyFont(Font.systemFont(11));
+    const flameImg = header.addImage(flame.image);
+    flameImg.imageSize = new Size(11, 11);
+    flameImg.tintColor = new Color("#22c55e");
+    header.addSpacer(2);
+    const streakText = header.addText(`${streak}`);
     streakText.font = Font.systemFont(11);
     streakText.textColor = new Color("#9ca3af");
   }

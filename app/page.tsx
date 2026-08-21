@@ -204,6 +204,12 @@ export default function Home() {
             <Flame size={14} strokeWidth={2.25} style={{ color: streak.current > 0 ? 'var(--signal)' : 'var(--text-muted)' }} />
             {streak.current > 0 ? `${streak.current} day streak` : 'No streak yet'}
           </span>
+          {streak.longest > streak.current && (
+            <>
+              <span aria-hidden="true">·</span>
+              <span>best {streak.longest}</span>
+            </>
+          )}
           <span aria-hidden="true">·</span>
           <span>{streak.weekCount}/7 this week</span>
         </div>
