@@ -1,36 +1,66 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Signal
 
-## Getting Started
+Personal capture tool — quick task/thought entry that auto-escalates urgency over time. Runs entirely local: private GitHub repo, no public deployment, SQLite on disk, uploads on disk.
 
-First, run the development server:
+## Local setup
+
+```bash
+npm install
+cp .env.local.example .env.local
+```
+
+Fill in `.env.local`:
+- `SIGNAL_PASSCODE` — whatever passcode unlocks `/login`
+- `AUTH_SECRET` — generate with `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`
+
+Leave `TURSO_DATABASE_URL` / `BLOB_READ_WRITE_TOKEN` unset — without them the app uses a local SQLite file (`data/signal.db`) and writes uploads to `public/uploads`, which is all local-only needs.
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open `http://localhost:3000` on the Mac to confirm it's running.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Installing it on your phone (same Wi-Fi, local only)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+The dev server already binds to `0.0.0.0`, so any device on the same network can reach it — nothing public involved.
 
-## Learn More
+1. Find the Mac's LAN IP:
+   ```bash
+   ipconfig getifaddr en0
+   ```
+2. On your iPhone (same Wi-Fi), open Safari and go to `http://<that-ip>:3000`.
+3. Tap the Share icon → **Add to Home Screen**. It installs using the existing `manifest.json` / icons — full-screen, no browser chrome, looks like a real app.
 
-To learn more about Next.js, take a look at the following resources:
+This covers viewing and adding signals from your phone. One caveat: iOS only allows a Service Worker to register over HTTPS or `localhost` — over plain `http://<lan-ip>` the install icon works, but push notifications (`sw.js`) won't fire. If you want push working locally too:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+npm run dev -- --experimental-https
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+then visit `https://<mac-ip>:3000` from the phone and accept the self-signed certificate prompt (Safari will warn once — proceed anyway). Re-add to home screen from the `https://` URL so the installed icon points at the secure origin.
 
-## Deploy on Vercel
+## Keeping it running
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+`npm run dev` needs the terminal window (or an SSH session) to stay alive. For a longer-lived local session without babysitting a terminal:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+npm run build
+nohup npm run start > signal.log 2>&1 &
+```
+
+`next start` also binds `0.0.0.0` by default, so the same phone-install steps apply — minus `--experimental-https`, which is dev-only (drop the push-notification path if you go this route, or reintroduce HTTPS with `--experimental-https-key` / `--experimental-https-cert` pointed at your own cert).
+
+## What no longer works now that it's local-only
+
+The three scheduled jobs in `vercel.json` (`daily-reminder`, `weekly-recap`, `streak-risk`) were fired by Vercel Cron against the public deployment — with no deployment, they don't run. If you want them back, the endpoints are still live locally at `/api/cron/*`; the simplest fix is a `crontab -e` entry that `curl`s them on the same schedule while the local server is up, e.g.:
+
+```
+0 12 * * *   curl -s http://localhost:3000/api/cron/daily-reminder
+0 0 * * 1    curl -s http://localhost:3000/api/cron/weekly-recap
+30 0 * * *   curl -s http://localhost:3000/api/cron/streak-risk
+```
+
+## Stack
+
+Next.js 16 (App Router, `proxy.ts` for middleware), React 19, Tailwind 4, libSQL/SQLite, `web-push` for notifications.
