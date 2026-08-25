@@ -1,66 +1,40 @@
 # Signal
 
-Personal capture tool — quick task/thought entry that auto-escalates urgency over time. Runs entirely local: private GitHub repo, no public deployment, SQLite on disk, uploads on disk.
+Personal capture tool — quick task/thought entry that auto-escalates urgency over time. Deployed on Vercel, gated by a passcode (`SIGNAL_PASSCODE`) rather than being a genuinely private deployment — GitHub repo is public, data lives in Turso (libSQL) and Vercel Blob.
 
-## Local setup
+**Live URL:** https://signal-woad-one.vercel.app
+
+## Installing it on your phone
+
+Visit the live URL above in Safari (works over cellular or Wi-Fi — no LAN/same-network requirement), log in with the passcode, then Share icon → **Add to Home Screen**. Full-screen, no browser chrome, push notifications work immediately since the URL is real HTTPS.
+
+## Local development
 
 ```bash
 npm install
 cp .env.local.example .env.local
 ```
 
-Fill in `.env.local`:
-- `SIGNAL_PASSCODE` — whatever passcode unlocks `/login`
-- `AUTH_SECRET` — generate with `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`
-
-Leave `TURSO_DATABASE_URL` / `BLOB_READ_WRITE_TOKEN` unset — without them the app uses a local SQLite file (`data/signal.db`) and writes uploads to `public/uploads`, which is all local-only needs.
+Fill in `.env.local` — `SIGNAL_PASSCODE`, `AUTH_SECRET` (generate with `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`), and `TURSO_DATABASE_URL`/`TURSO_AUTH_TOKEN` if you want local dev to read the real production data (`turso db show signal` / `turso db tokens create signal`). Leave those two unset to fall back to a local SQLite file (`data/signal.db`) instead.
 
 ```bash
 npm run dev
 ```
 
-Open `http://localhost:3000` on the Mac to confirm it's running.
-
-## Installing it on your phone (same Wi-Fi, local only)
-
-The dev server already binds to `0.0.0.0`, so any device on the same network can reach it — nothing public involved.
-
-1. Find the Mac's LAN IP:
-   ```bash
-   ipconfig getifaddr en0
-   ```
-2. On your iPhone (same Wi-Fi), open Safari and go to `http://<that-ip>:3000`.
-3. Tap the Share icon → **Add to Home Screen**. It installs using the existing `manifest.json` / icons — full-screen, no browser chrome, looks like a real app.
-
-This covers viewing and adding signals from your phone. One caveat: iOS only allows a Service Worker to register over HTTPS or `localhost` — over plain `http://<lan-ip>` the install icon works, but push notifications (`sw.js`) won't fire. If you want push working locally too:
+## Deploying
 
 ```bash
-npm run dev -- --experimental-https
+vercel --prod
 ```
 
-then visit `https://<mac-ip>:3000` from the phone and accept the self-signed certificate prompt (Safari will warn once — proceed anyway). Re-add to home screen from the `https://` URL so the installed icon points at the secure origin.
+Project is linked (`nicholas-projects12/signal`). **Note:** GitHub auto-deploy-on-push isn't connected right now (the Vercel↔GitHub App connection failed during the 2026-08-25 redeploy) — pushes to `main` do NOT automatically deploy. Either run `vercel --prod` manually after pushing, or reconnect the GitHub integration from the Vercel dashboard (Project Settings → Git).
 
-## Keeping it running
+Cron jobs (`daily-reminder`, `weekly-recap`, `streak-risk` in `vercel.json`) run automatically via Vercel Cron against the live deployment — no manual crontab needed.
 
-`npm run dev` needs the terminal window (or an SSH session) to stay alive. For a longer-lived local session without babysitting a terminal:
+**Known gap:** a Vercel Blob store (`signal`, `store_1vpgS8dLjBblI4we`) exists but isn't connected to this project, so `BLOB_READ_WRITE_TOKEN` isn't set — attachment uploads will fail until it's connected via the Vercel dashboard (Project Settings → Storage → Connect Store). No real signal currently has an attachment, so this isn't urgent.
 
-```bash
-npm run build
-nohup npm run start > signal.log 2>&1 &
-```
-
-`next start` also binds `0.0.0.0` by default, so the same phone-install steps apply — minus `--experimental-https`, which is dev-only (drop the push-notification path if you go this route, or reintroduce HTTPS with `--experimental-https-key` / `--experimental-https-cert` pointed at your own cert).
-
-## What no longer works now that it's local-only
-
-The three scheduled jobs in `vercel.json` (`daily-reminder`, `weekly-recap`, `streak-risk`) were fired by Vercel Cron against the public deployment — with no deployment, they don't run. If you want them back, the endpoints are still live locally at `/api/cron/*`; the simplest fix is a `crontab -e` entry that `curl`s them on the same schedule while the local server is up, e.g.:
-
-```
-0 12 * * *   curl -s http://localhost:3000/api/cron/daily-reminder
-0 0 * * 1    curl -s http://localhost:3000/api/cron/weekly-recap
-30 0 * * *   curl -s http://localhost:3000/api/cron/streak-risk
-```
+**Worth testing:** Google Calendar sync, since the OAuth redirect URI registered in Google Cloud Console may still point at an old deployment URL. If `/settings` calendar connection fails, that's the first thing to check.
 
 ## Stack
 
-Next.js 16 (App Router, `proxy.ts` for middleware), React 19, Tailwind 4, libSQL/SQLite, `web-push` for notifications.
+Next.js 16 (App Router, `proxy.ts` for middleware), React 19, Tailwind 4, libSQL/SQLite (Turso), Vercel Blob, `web-push` for notifications.
